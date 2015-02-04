@@ -30,20 +30,20 @@ type DistLockTest() =
     [<Fact>]
     let testAcquireLock() = 
         let distLock = new DistLock()
-        Assert.True(distLock.acquire "lockTest1")
+        Assert.True(distLock.acquire "distTest1")
 
     [<Fact>]
     let testAcquireLockTwice() =
         let distLock = new DistLock()
-        Assert.True(distLock.acquireValue "lockTest2" "valueTest")
-        Assert.False(distLock.acquireValue "lockTest2" "valueTest")
+        Assert.True(distLock.acquireValue "valueTest" "distTest2")
+        Assert.False(distLock.acquireValue "valueTest" "distTest2")
 
     [<Fact>]
     let testAcquireAndReleaseLock() =
         let distLock = new DistLock()
-        Assert.True(distLock.acquireValue "lockTest3" "valueTest")
-        distLock.releaseValue "lockTest3" "valueTest"
-        Assert.True(distLock.acquireValue "lockTest3" "valueTest2")
+        Assert.True(distLock.acquireValue "valueTest" "distTest3")
+        distLock.releaseValue "valueTest" "distTest3" 
+        Assert.True(distLock.acquireValue "valueTest2" "distTest3")
 
     interface IUseFixture<RedisInstance> with
         member this.SetFixture(data) = ()

@@ -7,15 +7,19 @@
 open System.Xml
 open System.Xml.Serialization
 open System.IO
+open System.Diagnostics
+open RedLockFS
 
-let config = new RedLockFS.RedLockConfiguration()
-let instance = new RedLockFS.RedisInstanceElement()
-instance.Value <- "http://localhost"
-config.redisInstances <- [|instance |]
-let serializer = new XmlSerializer(config.GetType())
-let wr = new StreamWriter("redisConfig.xml")
-serializer.Serialize(wr, config)
+let singleLock3 = new SingleLock("localhost")
+printfn "lock3 acquired: %A" (singleLock3.acquire "test1")
+let singleLock2 = new SingleLock("localhost")
+printfn "lock2 acquired: %A" (singleLock2.acquire "test1")
 
-
-// Define your library scripting code here
-
+let chrono = new Stopwatch()
+chrono.Start()
+let singleLock = new SingleLock("localhost")
+singleLock.waitForLock "test4" 10000.
+printfn "first lock acquired after %d ms" chrono.ElapsedMilliseconds
+let singleLock1 = new SingleLock("localhost")
+singleLock1.waitForLock "test4" 5000.
+printfn "second lock acquired after %d ms" chrono.ElapsedMilliseconds
