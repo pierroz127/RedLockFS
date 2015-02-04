@@ -39,12 +39,9 @@ type SingleLock(cnx: string) =
         let counter = MailboxProcessor<Message>.Start(fun inbox ->
             let rec loop(status) = 
                 async {
-                    printfn "waiting for a message"
                     let! msg = inbox.Receive()
-                    printfn "message received!"
                     match msg with
                     | Acquire -> 
-                        printfn "msg = lock was acquired"
                         match status with
                         | Pending -> do! loop(LockAcquired)
                         | _ -> do! loop(status)
@@ -53,7 +50,6 @@ type SingleLock(cnx: string) =
                         | Pending -> do! loop(LockTimeout)
                         | _ -> do! loop(status)
                     | Fetch(replyChannel) -> 
-                            printfn "replying with current status %A" status    
                             replyChannel.Reply(status)
                 }
             loop(Pending)
@@ -74,14 +70,12 @@ type SingleLock(cnx: string) =
                 
         let work() = 
             try
-                printfn "working thread..."
                 Thread.Sleep(Timeout.Infinite)
             with 
             | :? ThreadInterruptedException -> printfn "Thread interrupted!"
             
         let rec getResult() = 
             let r = counter.PostAndReply(fun replyChannel -> Fetch(replyChannel))
-            printfn "status returned by agent: %A" r      
             match r with 
             | LockAcquired -> true
             | LockTimeout -> false
@@ -90,14 +84,11 @@ type SingleLock(cnx: string) =
                 getResult() 
 
         let thread = new System.Threading.Thread(work);
-        printfn "Let's start the show"
         thread.Start()
         let timers = 
             [createObservable 1000. (fun _ -> tryGetLock thread);
             createObservable timeout (fun _ -> postAndInterrupt Timeout thread)]
         thread.Join()
-        printfn "thread has just joined"
         timers |> List.map (fun t -> t.Stop()) |> ignore
-        printfn "timers have been stopped"
         getResult()
         
