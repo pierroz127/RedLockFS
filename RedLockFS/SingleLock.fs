@@ -1,4 +1,18 @@
-﻿namespace RedLockFS
+﻿//   Copyright 2015 Pierre Leroy
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//
+//       http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
+namespace RedLockFS
 
 open System
 open System.Threading
@@ -18,10 +32,12 @@ type SingleLock(cnx: string) =
     let redis = ConnectionMultiplexer.Connect(cnx)
     let token = Guid.NewGuid().ToString()    
 
-    member this.acquireValue lockValue lockName =
+    member this.acquireValueWithLeaseTime leaseTime lockValue lockName = 
         let db = redis.GetDatabase()
-        db.StringSet(helper.toRedisKey lockName, helper.toRedisValue lockValue, Nullable(new TimeSpan(0, 0, 30)), When.NotExists)
+        db.StringSet(helper.toRedisKey lockName, helper.toRedisValue lockValue, Nullable(new TimeSpan(0, 0, leaseTime)), When.NotExists)   
 
+    member this.acquireValue = RedLockConfiguration.current.defaultLeaseTime.value |> this.acquireValueWithLeaseTime
+        
     member this.acquire = token |> this.acquireValue
 
     member this.releaseValue lockValue lockName= 
@@ -31,9 +47,17 @@ type SingleLock(cnx: string) =
                                 then return redis.call(""del"",KEYS[1]) 
                                 else return 0 end",
                               [| helper.toRedisKey lockName |], 
-                              [|helper.toRedisValue lockValue|]))
+                              [| helper.toRedisValue lockValue |]))
          
     member this.release = token |> this.releaseValue    
+
+    member this.isLocked lockName = 
+        let db = redis.GetDatabase()
+        not (db.StringGet(helper.toRedisKey lockName).IsNull)
+        
+    member this.isHoldingLock lockValue lockName = 
+        let db = redis.GetDatabase()
+        helper.toRedisValue(lockValue).Equals(db.StringGet(helper.toRedisKey lockName))
 
     member this.waitForLock lockName timeout = 
         let counter = MailboxProcessor<Message>.Start(fun inbox ->
